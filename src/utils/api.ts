@@ -7,13 +7,14 @@ import {
   AgentResponse,
   AgentsListResponse,
 } from '../types';
+import { config } from './config';
 
 // Flag to use mock data instead of actual API
-const USE_MOCK = false;
+const USE_MOCK = config.useMockData;
 
 // Set up Axios with default error handling
 const documentApi = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_DOCUMENT_API_URL || 'http://51.20.138.127:8000/',
+  baseURL: config.documentApiUrl,
   headers: {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
@@ -21,7 +22,7 @@ const documentApi = axios.create({
 });
 
 const agentManagerApi = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_AGENT_MANAGER_URL || 'http://51.20.138.127:8001/',
+  baseURL: config.agentManagerApiUrl,
   headers: {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
@@ -81,6 +82,9 @@ export const uploadDocuments = async (
   }
 
   try {
+    // Log the API URL being used
+    console.log(`Using Document API URL: ${documentApi.defaults.baseURL}`);
+    
     const formData = new FormData();
     Array.from(files).forEach((file) => {
       formData.append('files', file);
@@ -99,8 +103,47 @@ export const uploadDocuments = async (
     );
     
     return response.data;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error uploading documents:', error);
+    
+    // Enhanced error logging
+    const axiosError = error as { 
+      response?: { 
+        status: number; 
+        data: Record<string, unknown>; 
+        headers?: Record<string, string>; 
+      };
+      request?: XMLHttpRequest;
+      message?: string;
+      config?: {
+        url?: string;
+        method?: string;
+        headers?: Record<string, string>;
+      };
+    };
+    
+    if (axiosError.response) {
+      // The request was made and the server responded with a status code
+      // that falls out of the range of 2xx
+      console.error('Response status:', axiosError.response.status);
+      console.error('Response data:', axiosError.response.data);
+      console.error('Response headers:', axiosError.response.headers);
+    } else if (axiosError.request) {
+      // The request was made but no response was received
+      // `error.request` is an instance of XMLHttpRequest in the browser
+      console.error('Request was made but no response:', axiosError.request);
+    } else {
+      // Something happened in setting up the request that triggered an Error
+      console.error('Error message:', axiosError.message);
+    }
+    
+    // Log request configuration for debugging
+    if (axiosError.config) {
+      console.error('Request URL:', axiosError.config.url);
+      console.error('Request method:', axiosError.config.method);
+      console.error('Request headers:', axiosError.config.headers);
+    }
+    
     throw error;
   }
 };
