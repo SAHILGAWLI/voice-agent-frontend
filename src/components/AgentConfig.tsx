@@ -4,7 +4,7 @@ import { configureAgent } from '../utils/api';
 import { AgentConfigFormData, UserIdProps } from '../types';
 
 export default function AgentConfig({ userId }: UserIdProps) {
-  const { register, handleSubmit, formState: { isSubmitting } } = useForm<AgentConfigFormData>({
+  const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm<AgentConfigFormData>({
     defaultValues: {
       system_prompt: 'You are a helpful assistant. Provide accurate and concise information based on the documents provided.',
       voice: 'alloy',
@@ -17,12 +17,14 @@ export default function AgentConfig({ userId }: UserIdProps) {
 
   const onSubmit: SubmitHandler<AgentConfigFormData> = async (data) => {
     try {
-      const result = await configureAgent(userId, data);
-      setResult({ success: true, message: result.message });
-    } catch (error: any) {
+      const response = await configureAgent(userId, data);
+      setResult({ success: true, message: response.message });
+      reset();
+    } catch (error: Error | unknown) {
+      console.error("Configuration error:", error);
       setResult({ 
         success: false, 
-        message: error.response?.data?.detail || error.message 
+        message: error instanceof Error ? error.message : 'Configuration failed'
       });
     }
   };

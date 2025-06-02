@@ -1,5 +1,15 @@
+import {
+  Collection,
+  CollectionsResponse,
+  DocumentUploadResponse,
+  ConfigResponse,
+  AgentResponse,
+  AgentsListResponse,
+  Agent
+} from '../../types';
+
 // Mock collections
-export const mockCollections = [
+export const mockCollections: Collection[] = [
   {
     name: 'Default Collection',
     path: '/collections/default',
@@ -18,12 +28,13 @@ export const mockCollections = [
 ];
 
 // Mock agents
-export const mockAgents = {};
+export const mockAgents: Record<string, Agent> = {};
 
 // Mock responses
 export const mockResponses = {
   // Document Upload API
-  listCollections: (userId: string): CollectionsResponse => ({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  listCollections: (_: string): CollectionsResponse => ({
     collections: mockCollections
   }),
 
@@ -34,7 +45,8 @@ export const mockResponses = {
     index_id: `${userId}_index_123`
   }),
 
-  configureAgent: (userId: string): ConfigResponse => ({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  configureAgent: (_: string): ConfigResponse => ({
     status: 'success',
     message: 'Agent configuration updated successfully'
   }),

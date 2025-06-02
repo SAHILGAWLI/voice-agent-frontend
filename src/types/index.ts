@@ -61,7 +61,7 @@ export interface DocumentUploadFormData {
   documents: FileList;
 }
 
-export interface AgentConfigFormData extends AgentConfig {}
+export type AgentConfigFormData = AgentConfig;
 
 export interface AgentControlFormData {
   collection_name?: string;

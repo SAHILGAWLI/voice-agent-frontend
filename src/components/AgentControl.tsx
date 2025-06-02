@@ -55,7 +55,7 @@ export default function AgentControl({ userId }: UserIdProps) {
         phone_number: data.phone_number || null,
         agent_type: data.agent_type
       });
-      const result = await startAgent(
+      const response = await startAgent(
         userId,
         data.collection_name || null,
         data.phone_number || null,
@@ -64,15 +64,16 @@ export default function AgentControl({ userId }: UserIdProps) {
       
       setResult({
         success: true,
-        message: result.status === 'already_running' 
+        message: response.status === 'already_running' 
           ? 'Agent is already running' 
           : 'Agent started successfully'
       });
       
       setAgentRunning(true);
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       console.error("Error starting agent:", error);
-      const errorDetail = error.response?.data?.detail || error.message || 'Failed to start agent';
+      const errorDetail = 
+        error instanceof Error ? error.message : 'Failed to start agent';
       console.error("Error detail:", errorDetail);
       setResult({ 
         success: false, 
@@ -85,7 +86,7 @@ export default function AgentControl({ userId }: UserIdProps) {
   const onStopAgent = async () => {
     try {
       setResult({ loading: true, message: "Stopping agent..." });
-      const result = await stopAgent(userId);
+      await stopAgent(userId);
       
       setResult({
         success: true,
@@ -93,11 +94,11 @@ export default function AgentControl({ userId }: UserIdProps) {
       });
       
       setAgentRunning(false);
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       console.error("Error stopping agent:", error);
       setResult({ 
         success: false, 
-        message: error.response?.data?.detail || error.message || 'Failed to stop agent' 
+        message: error instanceof Error ? error.message : 'Failed to stop agent'
       });
     }
   };
@@ -218,9 +219,9 @@ export default function AgentControl({ userId }: UserIdProps) {
               setResult({ loading: true, message: "Testing API..." });
               await testStartAgent(userId);
               setResult({ success: true, message: "API test successful" });
-            } catch (error: any) {
+            } catch (error: Error | unknown) {
               console.error("Test API error:", error);
-              const errorDetail = error.response?.data?.detail || error.message || 'Unknown error';
+              const errorDetail = error instanceof Error ? error.message : 'Unknown error';
               setResult({ 
                 success: false, 
                 message: `API test failed`,

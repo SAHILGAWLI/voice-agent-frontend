@@ -13,7 +13,7 @@ const USE_MOCK = false;
 
 // Set up Axios with default error handling
 const documentApi = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_DOCUMENT_API_URL || 'http://localhost:8000',
+  baseURL: process.env.NEXT_PUBLIC_DOCUMENT_API_URL || 'http://51.20.138.127:8000/',
   headers: {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
@@ -21,7 +21,7 @@ const documentApi = axios.create({
 });
 
 const agentManagerApi = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_AGENT_MANAGER_URL || 'http://localhost:8001',
+  baseURL: process.env.NEXT_PUBLIC_AGENT_MANAGER_URL || 'http://51.20.138.127:8001/',
   headers: {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
@@ -30,11 +30,11 @@ const agentManagerApi = axios.create({
 
 // Prevent Axios from making actual API calls when using mock
 if (USE_MOCK) {
-  documentApi.interceptors.request.use((config) => {
+  documentApi.interceptors.request.use(() => {
     return Promise.reject(new Error('Using mock data'));
   });
   
-  agentManagerApi.interceptors.request.use((config) => {
+  agentManagerApi.interceptors.request.use(() => {
     return Promise.reject(new Error('Using mock data'));
   });
 }
@@ -58,7 +58,12 @@ const mockCollections = [
   }
 ];
 
-const mockAgents: Record<string, any> = {};
+// Using Record with specific type instead of 'any'
+const mockAgents: Record<string, {
+  user_id: string;
+  agent_type: 'voice' | 'web';
+  running_time: number;
+}> = {};
 
 // Document Upload API
 export const uploadDocuments = async (
@@ -173,18 +178,24 @@ export const startAgent = async (
     const response = await agentManagerApi.post<AgentResponse>('/start-agent', payload);
     
     return response.data;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error starting agent:', error);
     
     // Extract more detailed error information if available
-    if (error.response) {
-      console.error('Response status:', error.response.status);
-      console.error('Response data:', JSON.stringify(error.response.data));
+    const axiosError = error as { 
+      response?: { 
+        status: number; 
+        data: { detail?: string; [key: string]: unknown } 
+      } 
+    };
+    if (axiosError.response) {
+      console.error('Response status:', axiosError.response.status);
+      console.error('Response data:', JSON.stringify(axiosError.response.data));
       
       // If it's a validation error, log more details
-      if (error.response.status === 422) {
+      if (axiosError.response.status === 422) {
         console.error('Validation error details:', 
-          error.response.data?.detail || 'No detail provided');
+          axiosError.response.data?.detail || 'No detail provided');
       }
     }
     
@@ -229,7 +240,7 @@ export const listAgents = async (): Promise<AgentsListResponse> => {
 };
 
 // Test function to try minimal payload
-export const testStartAgent = async (userId: string): Promise<any> => {
+export const testStartAgent = async (userId: string): Promise<Record<string, unknown>> => {
   try {
     // Try with absolute minimal payload
     const minimalPayload = {
@@ -241,11 +252,17 @@ export const testStartAgent = async (userId: string): Promise<any> => {
     
     const response = await agentManagerApi.post('/start-agent', minimalPayload);
     return response.data;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Test API error:', error);
-    if (error.response) {
-      console.error('Test response status:', error.response.status);
-      console.error('Test response data:', JSON.stringify(error.response.data));
+    const axiosError = error as { 
+      response?: { 
+        status: number; 
+        data: { detail?: string; [key: string]: unknown } 
+      } 
+    };
+    if (axiosError.response) {
+      console.error('Test response status:', axiosError.response.status);
+      console.error('Test response data:', JSON.stringify(axiosError.response.data));
     }
     throw error;
   }

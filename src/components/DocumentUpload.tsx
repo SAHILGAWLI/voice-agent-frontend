@@ -38,13 +38,13 @@ export default function DocumentUpload({ userId }: UserIdProps) {
       setSelectedFiles([]);
       reset();
       
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       // Handle upload errors gracefully
       console.error("Upload error:", error);
       
       setResult({ 
         success: false, 
-        message: error.response?.data?.detail || error.message || 'Upload failed'
+        message: error instanceof Error ? error.message : 'Upload failed'
       });
     }
   };
