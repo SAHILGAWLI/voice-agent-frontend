@@ -66,6 +66,103 @@ const mockAgents: Record<string, {
   running_time: number;
 }> = {};
 
+// Enhanced debugging utility
+export const debugApiError = (error: unknown, context: string): string => {
+  console.group(`🔍 API Error Debug: ${context}`);
+  console.error('Error object:', error);
+  
+  // Detailed error information
+  const axiosError = error as { 
+    response?: { 
+      status: number; 
+      statusText?: string;
+      data: Record<string, unknown>; 
+      headers?: Record<string, string>; 
+    };
+    request?: XMLHttpRequest;
+    message?: string;
+    config?: {
+      url?: string;
+      baseURL?: string;
+      method?: string;
+      headers?: Record<string, string>;
+      data?: unknown;
+    };
+    code?: string;
+    isAxiosError?: boolean;
+  };
+  
+  let debugInfo = `API Error in ${context}\n`;
+  
+  // Connection details
+  debugInfo += `\nConnection Details:\n`;
+  debugInfo += `- API URL: ${axiosError.config?.baseURL || 'unknown'}\n`;
+  debugInfo += `- Endpoint: ${axiosError.config?.url || 'unknown'}\n`;
+  debugInfo += `- Method: ${axiosError.config?.method?.toUpperCase() || 'unknown'}\n`;
+  
+  if (axiosError.response) {
+    // Server responded with non-2xx status
+    console.error('📡 Server responded with error:', {
+      status: axiosError.response.status,
+      statusText: axiosError.response.statusText,
+      data: axiosError.response.data,
+      headers: axiosError.response.headers,
+    });
+    
+    debugInfo += `\nServer Response:\n`;
+    debugInfo += `- Status: ${axiosError.response.status} ${axiosError.response.statusText || ''}\n`;
+    debugInfo += `- Response Data: ${JSON.stringify(axiosError.response.data, null, 2)}\n`;
+    
+    // CORS error detection
+    const corsError = 
+      axiosError.response.status === 0 ||
+      axiosError.response.status === 403 ||
+      axiosError.message?.includes('CORS') ||
+      axiosError.message?.includes('cross-origin');
+    
+    if (corsError) {
+      console.error('❌ CORS POLICY ERROR DETECTED!');
+      debugInfo += `\n❌ CORS POLICY ERROR DETECTED!\n`;
+      debugInfo += `The server is not allowing requests from ${window.location.origin}.\n`;
+      debugInfo += `Server needs to add this origin to its CORS allowed origins list.\n`;
+    }
+    
+  } else if (axiosError.request) {
+    // Request was made but no response received (network error)
+    console.error('🔌 Network error - Request sent but no response:', {
+      request: axiosError.request,
+      message: axiosError.message,
+    });
+    
+    debugInfo += `\nNetwork Error:\n`;
+    debugInfo += `- Type: Request sent but no response received\n`;
+    debugInfo += `- Message: ${axiosError.message || 'Connection failed'}\n`;
+    debugInfo += `- This usually indicates server is unreachable or down\n`;
+    
+  } else {
+    // Error setting up request
+    console.error('⚠️ Request setup error:', axiosError.message);
+    
+    debugInfo += `\nRequest Setup Error:\n`;
+    debugInfo += `- Message: ${axiosError.message || 'Unknown error'}\n`;
+    
+    if (axiosError.message?.includes('Network Error')) {
+      debugInfo += `- This appears to be a network connectivity issue\n`;
+      debugInfo += `- Check if the API server is running and accessible\n`;
+    }
+  }
+  
+  // Environment information
+  debugInfo += `\nEnvironment Info:\n`;
+  debugInfo += `- Frontend URL: ${window.location.origin}\n`;
+  debugInfo += `- Document API: ${config.documentApiUrl}\n`;
+  debugInfo += `- Agent Manager API: ${config.agentManagerApiUrl}\n`;
+  debugInfo += `- Browser: ${navigator.userAgent}\n`;
+  
+  console.groupEnd();
+  return debugInfo;
+};
+
 // Document Upload API
 export const uploadDocuments = async (
   userId: string,
@@ -83,11 +180,13 @@ export const uploadDocuments = async (
 
   try {
     // Log the API URL being used
-    console.log(`Using Document API URL: ${documentApi.defaults.baseURL}`);
+    console.log(`📤 Uploading documents to ${documentApi.defaults.baseURL}/upload/${userId}`);
+    console.log(`Files count: ${files.length}, Collection: ${collectionName || 'default'}`);
     
     const formData = new FormData();
     Array.from(files).forEach((file) => {
       formData.append('files', file);
+      console.log(`Adding file: ${file.name} (${file.size} bytes)`);
     });
     
     if (collectionName) {
@@ -102,49 +201,12 @@ export const uploadDocuments = async (
       }
     );
     
+    console.log('✅ Upload successful:', response.data);
     return response.data;
   } catch (error: unknown) {
-    console.error('Error uploading documents:', error);
-    
-    // Enhanced error logging
-    const axiosError = error as { 
-      response?: { 
-        status: number; 
-        data: Record<string, unknown>; 
-        headers?: Record<string, string>; 
-      };
-      request?: XMLHttpRequest;
-      message?: string;
-      config?: {
-        url?: string;
-        method?: string;
-        headers?: Record<string, string>;
-      };
-    };
-    
-    if (axiosError.response) {
-      // The request was made and the server responded with a status code
-      // that falls out of the range of 2xx
-      console.error('Response status:', axiosError.response.status);
-      console.error('Response data:', axiosError.response.data);
-      console.error('Response headers:', axiosError.response.headers);
-    } else if (axiosError.request) {
-      // The request was made but no response was received
-      // `error.request` is an instance of XMLHttpRequest in the browser
-      console.error('Request was made but no response:', axiosError.request);
-    } else {
-      // Something happened in setting up the request that triggered an Error
-      console.error('Error message:', axiosError.message);
-    }
-    
-    // Log request configuration for debugging
-    if (axiosError.config) {
-      console.error('Request URL:', axiosError.config.url);
-      console.error('Request method:', axiosError.config.method);
-      console.error('Request headers:', axiosError.config.headers);
-    }
-    
-    throw error;
+    const debugInfo = debugApiError(error, 'Document Upload');
+    console.error(debugInfo);
+    throw new Error(debugInfo);
   }
 };
 
@@ -160,11 +222,15 @@ export const configureAgent = async (
   }
 
   try {
+    console.log(`⚙️ Configuring agent for user ${userId}:`, config);
+    
     const response = await documentApi.post<ConfigResponse>(`/config/${userId}`, config);
+    console.log('✅ Agent configuration successful:', response.data);
     return response.data;
-  } catch (error) {
-    console.error('Error configuring agent:', error);
-    throw error;
+  } catch (error: unknown) {
+    const debugInfo = debugApiError(error, 'Agent Configuration');
+    console.error(debugInfo);
+    throw new Error(debugInfo);
   }
 };
 
@@ -176,11 +242,15 @@ export const listCollections = async (userId: string): Promise<CollectionsRespon
   }
 
   try {
+    console.log(`📂 Listing collections for user ${userId}`);
+    
     const response = await documentApi.get<CollectionsResponse>(`/collections/${userId}`);
+    console.log(`✅ Retrieved ${response.data.collections?.length || 0} collections`);
     return response.data;
-  } catch (error) {
-    console.error('Error listing collections:', error);
-    throw error;
+  } catch (error: unknown) {
+    const debugInfo = debugApiError(error, 'List Collections');
+    console.error(debugInfo);
+    throw new Error(debugInfo);
   }
 };
 
@@ -216,33 +286,16 @@ export const startAgent = async (
       agent_type: agentType
     };
     
-    console.log("Making POST request to /start-agent with payload:", JSON.stringify(payload));
+    console.log(`🚀 Starting ${agentType} agent for user ${userId}:`, payload);
     
     const response = await agentManagerApi.post<AgentResponse>('/start-agent', payload);
+    console.log('✅ Agent started successfully:', response.data);
     
     return response.data;
   } catch (error: unknown) {
-    console.error('Error starting agent:', error);
-    
-    // Extract more detailed error information if available
-    const axiosError = error as { 
-      response?: { 
-        status: number; 
-        data: { detail?: string; [key: string]: unknown } 
-      } 
-    };
-    if (axiosError.response) {
-      console.error('Response status:', axiosError.response.status);
-      console.error('Response data:', JSON.stringify(axiosError.response.data));
-      
-      // If it's a validation error, log more details
-      if (axiosError.response.status === 422) {
-        console.error('Validation error details:', 
-          axiosError.response.data?.detail || 'No detail provided');
-      }
-    }
-    
-    throw error;
+    const debugInfo = debugApiError(error, 'Start Agent');
+    console.error(debugInfo);
+    throw new Error(debugInfo);
   }
 };
 
@@ -258,11 +311,16 @@ export const stopAgent = async (userId: string): Promise<AgentResponse> => {
   }
 
   try {
+    console.log(`🛑 Stopping agent for user ${userId}`);
+    
     const response = await agentManagerApi.post<AgentResponse>(`/stop-agent/${userId}`);
+    console.log('✅ Agent stopped successfully:', response.data);
+    
     return response.data;
-  } catch (error) {
-    console.error('Error stopping agent:', error);
-    throw error;
+  } catch (error: unknown) {
+    const debugInfo = debugApiError(error, 'Stop Agent');
+    console.error(debugInfo);
+    throw new Error(debugInfo);
   }
 };
 
@@ -274,11 +332,16 @@ export const listAgents = async (): Promise<AgentsListResponse> => {
   }
 
   try {
+    console.log('👥 Listing all agents');
+    
     const response = await agentManagerApi.get<AgentsListResponse>('/agents');
+    console.log(`✅ Retrieved ${response.data.agents?.length || 0} agents`);
+    
     return response.data;
-  } catch (error) {
-    console.error('Error listing agents:', error);
-    throw error;
+  } catch (error: unknown) {
+    const debugInfo = debugApiError(error, 'List Agents');
+    console.error(debugInfo);
+    throw new Error(debugInfo);
   }
 };
 
@@ -291,22 +354,15 @@ export const testStartAgent = async (userId: string): Promise<Record<string, unk
       agent_type: 'voice'
     };
     
-    console.log("Testing with minimal payload:", JSON.stringify(minimalPayload));
+    console.log(`🧪 Testing API with minimal payload:`, minimalPayload);
     
     const response = await agentManagerApi.post('/start-agent', minimalPayload);
+    console.log('✅ API test successful:', response.data);
+    
     return response.data;
   } catch (error: unknown) {
-    console.error('Test API error:', error);
-    const axiosError = error as { 
-      response?: { 
-        status: number; 
-        data: { detail?: string; [key: string]: unknown } 
-      } 
-    };
-    if (axiosError.response) {
-      console.error('Test response status:', axiosError.response.status);
-      console.error('Test response data:', JSON.stringify(axiosError.response.data));
-    }
-    throw error;
+    const debugInfo = debugApiError(error, 'API Test');
+    console.error(debugInfo);
+    throw new Error(debugInfo);
   }
 }; 

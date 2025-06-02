@@ -5,14 +5,20 @@ import { useForm, SubmitHandler } from 'react-hook-form';
 import { uploadDocuments } from '../utils/api';
 import { DocumentUploadFormData, UserIdProps } from '../types';
 import FileInput from './FileInput';
+import ErrorDebug from './ErrorDebug';
 
 export default function DocumentUpload({ userId }: UserIdProps) {
   const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm<Omit<DocumentUploadFormData, 'documents'>>();
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [error, setError] = useState<Error | null>(null);
 
   const onSubmit: SubmitHandler<Omit<DocumentUploadFormData, 'documents'>> = async (data) => {
     try {
+      // Clear previous errors
+      setError(null);
+      setResult(null);
+      
       // Make sure documents exist before proceeding
       if (selectedFiles.length === 0) {
         setResult({ 
@@ -38,13 +44,16 @@ export default function DocumentUpload({ userId }: UserIdProps) {
       setSelectedFiles([]);
       reset();
       
-    } catch (error: Error | unknown) {
-      // Handle upload errors gracefully
-      console.error("Upload error:", error);
+    } catch (err) {
+      console.error("Upload error:", err);
       
+      // Set detailed error for debugging
+      setError(err instanceof Error ? err : new Error(String(err)));
+      
+      // Also set a simple user-friendly message
       setResult({ 
         success: false, 
-        message: error instanceof Error ? error.message : 'Upload failed'
+        message: 'Upload failed. See details below.' 
       });
     }
   };
@@ -97,6 +106,15 @@ export default function DocumentUpload({ userId }: UserIdProps) {
         <div className={`mt-4 p-4 rounded-md border-2 ${result.success ? 'bg-green-100 border-green-500 text-black' : 'bg-red-100 border-red-500 text-black'}`}>
           <p className="text-base font-bold">{result.message}</p>
         </div>
+      )}
+
+      {/* Show detailed error information if available */}
+      {error && (
+        <ErrorDebug 
+          error={error} 
+          context="Document Upload Error" 
+          onClose={() => setError(null)}
+        />
       )}
     </div>
   );
